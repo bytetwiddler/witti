@@ -36,6 +36,7 @@ Examples:
 	  whattime -limit 5 tokyo
   whattime Paris
 	  whattime "buenos aires" "new york" Anchorage
+	  whattime "02/17/2027 07:07:00" "new york"
 	  whattime tokyo -12h
   whattime america
   whattime tokyo -format "2006-01-02 15:04 MST"
@@ -57,17 +58,10 @@ Options:
 		flag.Usage()
 		os.Exit(2)
 	}
-	queryTerms := make([]queryTerm, 0, len(flag.Args()))
-	for _, arg := range flag.Args() {
-		term, err := parseQueryTerm(arg)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			os.Exit(2)
-		}
-		if term.raw == "" {
-			continue
-		}
-		queryTerms = append(queryTerms, term)
+	queryTerms, referenceTime, hasProjectedTime, err := parseQueryTermsAndReferenceTime(flag.Args(), time.Now(), time.Local)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(2)
 	}
 	if len(queryTerms) == 0 {
 		fmt.Fprintln(os.Stderr, "error: empty query")
@@ -82,6 +76,9 @@ Options:
 		}
 	}
 	querySummary := strings.Join(querySummaryParts, ", ")
+	if hasProjectedTime {
+		fmt.Fprintf(os.Stderr, "info: projecting local time %s\n", referenceTime.Format("2006-01-02 15:04:05 MST"))
+	}
 	if len(offsetSummaryParts) > 0 {
 		fmt.Fprintf(os.Stderr, "info: offset-aware mode active (%s)\n", strings.Join(offsetSummaryParts, "; "))
 	}
@@ -99,11 +96,10 @@ Options:
 
 	// Filter by case-insensitive substring match
 	matches := make([]string, 0, len(entries))
-	now := time.Now()
 	for _, name := range entries {
 		lowerName := strings.ToLower(name)
 		normalizedName := normalizeForMatch(name)
-		zoneOffset, ok := zoneOffsetAt(name, now)
+		zoneOffset, ok := zoneOffsetAt(name, referenceTime)
 		for _, term := range queryTerms {
 			if term.isOffset {
 				if ok && zoneOffset == term.offsetSeconds {
@@ -142,7 +138,7 @@ Options:
 			continue
 		}
 		printed++
-		t := time.Now().In(loc)
+		t := referenceTime.In(loc)
 		if *showPath && *zoneinfoRoot != "" {
 			fmt.Printf("%s\t%s\n", filepath.Join(*zoneinfoRoot, zoneName), t.Format(effectiveFormat))
 		} else {
@@ -154,6 +150,71 @@ Options:
 		fmt.Fprintf(os.Stderr, "No loadable timezone entries found for any of %q\n", querySummary)
 		os.Exit(1)
 	}
+}
+
+func parseQueryTermsAndReferenceTime(args []string, now time.Time, local *time.Location) ([]queryTerm, time.Time, bool, error) {
+	queryTerms := make([]queryTerm, 0, len(args))
+	referenceTime := now
+	hasProjectedTime := false
+
+	for _, arg := range args {
+		projected, isProjection, err := parseProjectedLocalTime(arg, local)
+		if err != nil {
+			return nil, time.Time{}, false, err
+		}
+		if isProjection {
+			if hasProjectedTime {
+				return nil, time.Time{}, false, fmt.Errorf("multiple projected local times provided; use only one datetime argument")
+			}
+			referenceTime = projected
+			hasProjectedTime = true
+			continue
+		}
+
+		term, err := parseQueryTerm(arg)
+		if err != nil {
+			return nil, time.Time{}, false, err
+		}
+		if term.raw == "" {
+			continue
+		}
+		queryTerms = append(queryTerms, term)
+	}
+
+	return queryTerms, referenceTime, hasProjectedTime, nil
+}
+
+func parseProjectedLocalTime(arg string, local *time.Location) (time.Time, bool, error) {
+	s := strings.TrimSpace(arg)
+	if s == "" {
+		return time.Time{}, false, nil
+	}
+
+	layouts := []string{
+		"01/02/2006 15:04:05",
+		"1/2/2006 15:04:05",
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05",
+	}
+
+	for _, layout := range layouts {
+		if t, err := time.ParseInLocation(layout, s, local); err == nil {
+			return t, true, nil
+		}
+	}
+
+	if looksLikeDateTimeInput(s) {
+		return time.Time{}, true, fmt.Errorf("invalid projected local time %q (expected formats like MM/DD/YYYY HH:MM:SS)", arg)
+	}
+
+	return time.Time{}, false, nil
+}
+
+func looksLikeDateTimeInput(s string) bool {
+	if !strings.Contains(s, ":") {
+		return false
+	}
+	return strings.Contains(s, "/") || strings.Contains(s, "-") || strings.ContainsRune(s, 'T')
 }
 
 func reorderArgsForFlagParse(args []string) ([]string, error) {

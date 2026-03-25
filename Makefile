@@ -24,7 +24,7 @@ else
   endef
 endif
 
-.PHONY: help build build-all run test clean
+.PHONY: help build build-all run test test-coverage clean
 
 help:
 	@echo "Targets:"
@@ -32,6 +32,7 @@ help:
 	@echo "  build-all  Cross-compile for all platforms into ./bin/"
 	@echo "  run        Run the app (pass args with ARGS='tokyo -limit 5')"
 	@echo "  test       Run go test ./..."
+	@echo "  test-coverage  Run tests and print coverage summary"
 	@echo "  clean      Remove built executables"
 
 build:
@@ -52,6 +53,10 @@ run:
 
 test:
 	go test ./...
+
+test-coverage:
+	go test -coverprofile=cover.out -count=1 ./...
+	go tool cover -func=cover.out
 
 clean:
 	$(RM_BIN)
