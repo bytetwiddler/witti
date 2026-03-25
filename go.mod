@@ -1,3 +1,3 @@
-module github.com/bytetwidder/witti
+module github.com/bytetwiddler/witti
 
 go 1.24
