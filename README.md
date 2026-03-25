@@ -13,6 +13,7 @@
 - 🔍 **Fuzzy name search** — `"Los Angeles"` matches `America/Los_Angeles`
 - 🌍 **Offset-aware queries** — `gmt-7`, `gmt+5:30`, `gmt-07:07` match zones by current UTC offset
 - 📋 **Multiple queries** — search several cities or offsets in a single command
+- 🧭 **Projected local time** — pass one local datetime argument to convert that instant across matched zones
 - 🕐 **12 / 24-hour clock** — 24-hour by default, switch with `-12h`
 - 🖥️ **Truly cross-platform** — bundles IANA tzdata via `time/tzdata`; no OS timezone files required
 - 🔀 **Flexible flag placement** — flags may appear before or after query terms
@@ -100,6 +101,25 @@ America/New_York                  Wed 2026-03-25 15:40:39 EDT -04:00
 ```
 
 Results from all query terms are combined, deduplicated, and sorted.
+
+### Project a local datetime into matched zones
+
+If one positional argument looks like a local datetime, `witti` uses that instant instead of the current time.
+
+Supported projected-time input formats:
+
+- `MM/DD/YYYY HH:MM:SS`
+- `M/D/YYYY HH:MM:SS`
+- `YYYY-MM-DD HH:MM:SS`
+- `YYYY-MM-DDTHH:MM:SS`
+
+Only one projected datetime argument is allowed per command.
+
+```
+$ witti "02/17/2027 07:07:00" "new york"
+info: projecting local time 2027-02-17 07:07:00 PST
+America/New_York                  Wed 2027-02-17 10:07:00 EST -05:00
+```
 
 ### Offset-aware query
 
