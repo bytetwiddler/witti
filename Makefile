@@ -10,7 +10,7 @@ ifeq ($(OS),Windows_NT)
   MKDIR_BIN  := cmd /c "if not exist bin mkdir bin"
   # Windows: env vars must be set via 'set' in cmd.exe before go build
   define BUILD_ONE
-	cmd /c "set GOOS=$(1)&& set GOARCH=$(2)&& go build -o bin/$(APP)-$(1)-$(2)$(3) ." && echo   built bin/$(APP)-$(1)-$(2)$(3)
+  cmd /c "set GOOS=$(1)&& set GOARCH=$(2)&& go build -o bin/$(APP)-$(1)-$(2)$(3) ./cmd/witti" && echo   built bin/$(APP)-$(1)-$(2)$(3)
   endef
 else
   EXE      :=
@@ -20,7 +20,7 @@ else
   MKDIR_BIN  := mkdir -p bin
   # Unix: inline env-var assignment
   define BUILD_ONE
-	GOOS=$(1) GOARCH=$(2) go build -o bin/$(APP)-$(1)-$(2)$(3) . && echo "  built bin/$(APP)-$(1)-$(2)$(3)"
+  GOOS=$(1) GOARCH=$(2) go build -o bin/$(APP)-$(1)-$(2)$(3) ./cmd/witti && echo "  built bin/$(APP)-$(1)-$(2)$(3)"
   endef
 endif
 
@@ -33,10 +33,12 @@ help:
 	@echo "  run        Run the app (pass args with ARGS='tokyo -limit 5')"
 	@echo "  test       Run go test ./..."
 	@echo "  test-coverage  Run tests and print coverage summary"
+	@echo "  test-verbose  Run tests and print coverage summary"
+	@echo "  test-all  Run verbose and coverage tests"
 	@echo "  clean      Remove built executables"
 
 build:
-	go build -o "$(BIN)" .
+	go build -o "$(BIN)" ./cmd/witti
 
 build-all:
 	$(MKDIR_BIN)
@@ -49,14 +51,19 @@ build-all:
 	$(call BUILD_ONE,freebsd,amd64,)
 
 run:
-	go run . $(ARGS)
+	go run ./cmd/witti $(ARGS)
 
 test:
 	go test ./...
 
+test-verbose:
+	go test -v ./...
+
 test-coverage:
 	go test -coverprofile=cover.out -count=1 ./...
 	go tool cover -func=cover.out
+
+test-all: test-verbose test-coverage
 
 clean:
 	$(RM_BIN)

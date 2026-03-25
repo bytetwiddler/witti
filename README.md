@@ -42,7 +42,7 @@ Download the binary for your platform from the [Releases](../../releases) page.
 Requires [Go 1.24+](https://go.dev/dl/).
 
 ```bash
-git clone https://github.com/your-username/witti.git
+git clone https://github.com/bytetwiddler/witti.git
 cd witti
 make build
 ```
@@ -71,9 +71,13 @@ witti <query...> [options]
 
 ## Examples
 
+All timestamped output below is **sample output**. Your actual results depend on the current date/time and timezone rules.
+
+> Offsets and abbreviations (for example `PST`/`PDT`, `EST`/`EDT`) can change by date due to DST and regional timezone rule updates.
+
 ### Search by city name
 
-```
+```text
 $ witti "Los Angeles"
 America/Los_Angeles               Wed 2026-03-25 12:40:39 PDT -07:00
 ```
@@ -82,7 +86,7 @@ Natural-language names with spaces match underscore-separated IANA zone IDs auto
 
 ### Search by region
 
-```
+```text
 $ witti america -limit 5
 America/Anchorage                 Wed 2026-03-25 11:40:39 AKDT -08:00
 America/Argentina/Buenos_Aires    Wed 2026-03-25 16:40:39 -03 -03:00
@@ -93,7 +97,7 @@ America/Denver                    Wed 2026-03-25 12:40:39 MDT -06:00
 
 ### Multiple queries at once
 
-```
+```text
 $ witti "buenos aires" "new york" Anchorage
 America/Anchorage                 Wed 2026-03-25 11:40:39 AKDT -08:00
 America/Argentina/Buenos_Aires    Wed 2026-03-25 16:40:39 -03 -03:00
@@ -115,7 +119,7 @@ Supported projected-time input formats:
 
 Only one projected datetime argument is allowed per command.
 
-```
+```text
 $ witti "02/17/2027 07:07:00" "new york"
 info: projecting local time 2027-02-17 07:07:00 PST
 America/New_York                  Wed 2027-02-17 10:07:00 EST -05:00
@@ -125,7 +129,7 @@ America/New_York                  Wed 2027-02-17 10:07:00 EST -05:00
 
 Queries beginning with `gmt+` or `gmt-` switch to **offset mode** — matching every zone whose current UTC offset equals the requested value. Useful when you know the offset but not the zone name.
 
-```
+```text
 $ witti "gmt-7" -limit 3
 info: offset-aware mode active (gmt-7 -> UTC-07:00)
 America/Los_Angeles               Wed 2026-03-25 12:40:39 PDT -07:00
@@ -143,11 +147,11 @@ Supported offset formats:
 | `gmt+5:30` | UTC+05:30 |
 | `gmt+0530` | UTC+05:30 |
 
-> **Note on DST:** offset matching is evaluated at the moment the command runs. A zone such as `America/Los_Angeles` appears in `gmt-7` results during summer (PDT) and in `gmt-8` results during winter (PST).
+> **Note on DST/date:** offset matching is evaluated at the moment the command runs (or at the projected instant when you pass a datetime argument). A zone such as `America/Los_Angeles` appears in `gmt-7` results during summer (PDT) and in `gmt-8` results during winter (PST).
 
 ### 12-hour clock
 
-```
+```text
 $ witti tokyo -limit 1 -12h
 Asia/Tokyo                        Thu 2026-03-26 04:40:39 AM JST +09:00
 ```
@@ -158,7 +162,7 @@ The `-12h` flag is ignored when `-format` is also provided, since `-format` alwa
 
 Uses [Go time format syntax](https://pkg.go.dev/time#Layout).
 
-```
+```text
 $ witti paris -format "2006-01-02 15:04 MST"
 Europe/Paris                      2026-03-25 21:40 CET
 ```
@@ -167,14 +171,14 @@ Europe/Paris                      2026-03-25 21:40 CET
 
 Both of the following are equivalent:
 
-```
+```text
 $ witti -limit 3 asia
 $ witti asia -limit 3
 ```
 
 Use `--` to pass a query that starts with a hyphen:
 
-```
+```text
 $ witti -- -myquery
 ```
 
@@ -202,6 +206,9 @@ make build-all
 # Run tests
 make test
 
+# Run tests with coverage summary
+make test-coverage
+
 # Remove built binaries
 make clean
 ```
@@ -214,9 +221,24 @@ make clean
 
 ```
 witti/
-├── main.go        # CLI entry point, matching, and output
-├── zones.go       # Built-in IANA zone name list
-├── main_test.go   # Table-driven unit tests
+├── cmd/
+│   └── witti/
+│       └── main.go        # Thin CLI entry point
+├── internal/
+│   └── cli/
+│       ├── flags.go       # CLI-only flag wiring and arg reordering
+│       └── flags_test.go
+├── witti.go       # Library entry point and run orchestration
+├── query.go       # Query and GMT-offset parsing
+├── datetime.go    # Projected local datetime parsing
+├── match.go       # Matching and normalization helpers
+├── zones_fs.go    # Filesystem-based zone discovery
+├── zones_source.go
+├── zones_default.go # Built-in IANA zone name list
+├── query_test.go
+├── datetime_test.go
+├── zones_test.go
+├── run_test.go     # Run orchestration and end-to-end behavior tests
 ├── Makefile       # Build, cross-compile, test, and clean targets
 ├── go.mod
 └── README.md
@@ -228,7 +250,7 @@ witti/
 
 1. Fork the repository and create a feature branch.
 2. Run `make test` to ensure all tests pass before opening a pull request.
-3. Keep new functions covered by table-driven tests in `main_test.go`.
+3. Keep new functions covered by table-driven tests in the corresponding `*_test.go` file.
 
 ---
 
