@@ -1,0 +1,166 @@
+openapi: 3.0.3
+info:
+  title: witti API
+  version: 1.0.0
+  description: REST API for timezone search/projection.
+servers:
+  - url: http://localhost:8080
+paths:
+  /healthz:
+    get:
+      summary: Health check
+      operationId: healthz
+      responses:
+        '200':
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        '405':
+          description: Method not allowed
+  /v1/search:
+    post:
+      summary: Search timezone matches
+      operationId: search
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchRequest'
+      responses:
+        '200':
+          description: Search completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchHTTPResponseSuccess'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchHTTPResponseError'
+        '405':
+          description: Method not allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchHTTPResponseError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchHTTPResponseError'
+components:
+  schemas:
+    SearchRequest:
+      type: object
+      required:
+        - queryTerms
+      properties:
+        queryTerms:
+          type: array
+          items:
+            type: string
+          description: Query terms; supports text, GMT offset terms, and inline projected datetime terms.
+          example: ["02/17/2027 07:07:00", "new york"]
+        zoneinfoRoot:
+          type: string
+          description: Optional IANA zoneinfo root for discovery.
+        format:
+          type: string
+          description: Go time layout string.
+          example: Mon 2006-01-02 15:04:05 MST -07:00
+        use12Hour:
+          type: boolean
+          description: Use default 12h output format when format is not explicitly provided.
+          default: false
+        limit:
+          type: integer
+          format: int32
+          minimum: 0
+          default: 0
+        showPath:
+          type: boolean
+          description: Use full filesystem path as displayName when zoneinfoRoot is set.
+          default: false
+        projectedLocalTime:
+          type: string
+          description: Explicit projected local datetime.
+          example: 02/17/2027 07:07:00
+        localTimeZone:
+          type: string
+          description: IANA timezone used to parse projected local datetime.
+          example: America/Los_Angeles
+    SearchMatch:
+      type: object
+      properties:
+        zoneName:
+          type: string
+          example: America/New_York
+        displayName:
+          type: string
+          example: America/New_York
+        time:
+          type: string
+          format: date-time
+        formattedTime:
+          type: string
+          example: Wed 2027-02-17 10:07:00 EST -05:00
+        utcOffsetSeconds:
+          type: integer
+          format: int32
+          example: -18000
+        abbreviation:
+          type: string
+          example: EST
+    SearchResponse:
+      type: object
+      properties:
+        querySummary:
+          type: string
+          example: 02/17/2027 07:07:00, new york
+        source:
+          type: string
+          example: built-in IANA zone list
+        referenceTime:
+          type: string
+          format: date-time
+        projectedTime:
+          type: boolean
+        offsetMode:
+          type: array
+          items:
+            type: string
+          example: ["gmt-7 -> UTC-07:00"]
+        noMatches:
+          type: boolean
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchMatch'
+    SearchHTTPResponseSuccess:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/SearchResponse'
+    SearchHTTPResponseError:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: invalid JSON request
+

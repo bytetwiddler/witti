@@ -16,6 +16,8 @@
 - 🧭 **Projected local time** — pass one local datetime argument to convert that instant across matched zones
 - 🕐 **12 / 24-hour clock** — 24-hour by default, switch with `-12h`
 - 🖥️ **Truly cross-platform** — bundles IANA tzdata via `time/tzdata`; no OS timezone files required
+- 🌐 **REST API** — exposes the same search/projection features over HTTP JSON
+- ✨ **Web SPA (Go + HTMX + Tailwind)** — Apple-style single-page interface on top of the same search API
 - 🔀 **Flexible flag placement** — flags may appear before or after query terms
 - ⚙️ **Custom format** — full Go time-format string support via `-format`
 
@@ -66,6 +68,71 @@ witti <query...> [options]
 | `-limit <n>` | `0` (no limit) | Cap number of results |
 | `-showpath` | off | Show full zoneinfo path (requires `-zoneinfo`) |
 | `-zoneinfo <path>` | built-in | Override IANA timezone data root for discovery |
+
+## Web UI (SPA)
+
+The project includes a single-page web app with an Apple-like look and feel, built with:
+
+- **Go** HTTP server
+- **HTMX** for dynamic partial updates (no frontend build step)
+- **Tailwind CSS** via CDN
+
+Run the combined web + API server:
+
+```bash
+make run-web ARGS="-addr :8080"
+```
+
+or directly:
+
+```bash
+go run ./cmd/witti-web -addr :8080
+```
+
+Open:
+
+- `http://localhost:8080/` → SPA
+- `http://localhost:8080/v1/search` → REST API endpoint
+- `http://localhost:8080/healthz` → health check
+
+The web UI posts form data to `/ui/search`, which returns HTML fragments rendered server-side from the same library logic used by CLI/API.
+
+## REST API
+
+See detailed docs in `api.md` and OpenAPI schema in `openapi.yaml`.
+
+Start the API server:
+
+```bash
+make run-api ARGS="-addr :8080"
+```
+
+Health endpoint:
+
+```bash
+curl http://localhost:8080/healthz
+```
+
+Search endpoint (`POST /v1/search`):
+
+```bash
+curl -X POST http://localhost:8080/v1/search \
+  -H "Content-Type: application/json" \
+  -d '{
+	"queryTerms": ["02/17/2027 07:07:00", "new york"],
+	"limit": 1,
+	"use12Hour": false
+  }'
+```
+
+Request JSON fields mirror library/CLI behavior:
+
+- `queryTerms` (required): array of terms; supports text, `gmt+/-` offset terms, and inline projected datetime term
+- `projectedLocalTime` (optional): explicit projected local datetime
+- `localTimeZone` (optional): IANA timezone name for parsing projected local datetime
+- `zoneinfoRoot`, `format`, `use12Hour`, `limit`, `showPath`
+
+Response includes metadata (`querySummary`, `referenceTime`, `projectedTime`, `offsetMode`) and structured `results`.
 
 ---
 
@@ -197,10 +264,16 @@ Multiple query terms use **OR** semantics — a zone is included if it matches a
 ## Building
 
 ```bash
-# Current platform
+# Current platform CLI binary
 make build
 
-# All platforms → ./bin/
+# REST API server binary
+make build-api
+
+# Web UI + API server binary
+make build-web
+
+# All platforms -> ./bin/
 make build-all
 
 # Run tests
@@ -224,11 +297,24 @@ witti/
 ├── cmd/
 │   └── witti/
 │       └── main.go        # Thin CLI entry point
+│   └── witti-api/
+│       └── main.go        # REST API entry point
+│   └── witti-web/
+│       └── main.go        # Web UI + API entry point
 ├── internal/
 │   └── cli/
 │       ├── flags.go       # CLI-only flag wiring and arg reordering
 │       └── flags_test.go
+│   └── httpapi/
+│       ├── server.go      # REST API HTTP handlers
+│       └── server_test.go
+│   └── webui/
+│       ├── server.go      # SPA + HTMX handlers and HTML fragments
+│       ├── server_test.go
+│       └── web/
+│           └── index.html # Embedded Tailwind + HTMX single-page app
 ├── witti.go       # Library entry point and run orchestration
+├── search.go      # Exported structured search API
 ├── query.go       # Query and GMT-offset parsing
 ├── datetime.go    # Projected local datetime parsing
 ├── match.go       # Matching and normalization helpers
@@ -281,4 +367,3 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
-

@@ -1,11 +1,9 @@
 package witti
 
 import (
+	"errors"
 	"fmt"
 	"io"
-	"path/filepath"
-	"sort"
-	"strings"
 	"time"
 	_ "time/tzdata"
 
@@ -40,97 +38,46 @@ func Run(args []string, stdout io.Writer, stderr io.Writer, now func() time.Time
 		return 2
 	}
 
-	queryTerms, referenceTime, hasProjectedTime, err := parseQueryTermsAndReferenceTime(fs.Args(), now(), local)
+	formatWasProvided := cli.WasFlagProvided(fs, "format")
+	resp, err := Search(SearchRequest{
+		QueryTerms:     fs.Args(),
+		ZoneinfoRoot:   opts.ZoneinfoRoot,
+		Format:         opts.Format,
+		Use12Hour:      opts.Use12Hour,
+		Limit:          opts.Limit,
+		ShowPath:       opts.ShowPath,
+		FormatProvided: formatWasProvided,
+	}, now, local)
 	if err != nil {
 		fmt.Fprintf(stderr, "error: %v\n", err)
-		return 2
-	}
-	if len(queryTerms) == 0 {
-		fmt.Fprintln(stderr, "error: empty query")
-		return 2
-	}
-
-	querySummaryParts := make([]string, 0, len(queryTerms))
-	offsetSummaryParts := make([]string, 0)
-	for _, term := range queryTerms {
-		querySummaryParts = append(querySummaryParts, term.raw)
-		if term.isOffset {
-			offsetSummaryParts = append(offsetSummaryParts, fmt.Sprintf("%s -> %s", term.raw, formatUTCOffset(term.offsetSeconds)))
+		if errors.Is(err, ErrInvalidRequest) {
+			return 2
 		}
-	}
-	querySummary := strings.Join(querySummaryParts, ", ")
-	if hasProjectedTime {
-		fmt.Fprintf(stderr, "info: projecting local time %s\n", referenceTime.Format("2006-01-02 15:04:05 MST"))
-	}
-	if len(offsetSummaryParts) > 0 {
-		fmt.Fprintf(stderr, "info: offset-aware mode active (%s)\n", strings.Join(offsetSummaryParts, "; "))
-	}
-
-	effectiveFormat := opts.Format
-	if opts.Use12Hour && !cli.WasFlagProvided(fs, "format") {
-		effectiveFormat = default12HourFormat
-	}
-
-	entries, sourceDesc, err := zoneCandidates(opts.ZoneinfoRoot)
-	if err != nil {
-		fmt.Fprintf(stderr, "error: collecting zones: %v\n", err)
 		return 1
 	}
 
-	matches := collectMatches(entries, queryTerms, referenceTime)
-	if len(matches) == 0 {
-		fmt.Fprintf(stdout, "No timezone entries found containing any of %q in %s\n", querySummary, sourceDesc)
+	if resp.ProjectedTime {
+		fmt.Fprintf(stderr, "info: projecting local time %s\n", resp.ReferenceTime.Format("2006-01-02 15:04:05 MST"))
+	}
+	if len(resp.OffsetMode) > 0 {
+		fmt.Fprintf(stderr, "info: offset-aware mode active (%s)\n", resp.OffsetSummary())
+	}
+	if resp.NoMatches {
+		fmt.Fprintf(stdout, "No timezone entries found containing any of %q in %s\n", resp.QuerySummary, resp.SourceDesc)
 		return 0
 	}
-
-	sort.Strings(matches)
-	if opts.Limit > 0 && opts.Limit < len(matches) {
-		matches = matches[:opts.Limit]
-	}
-
-	printed := 0
-	for _, zoneName := range matches {
-		loc, err := time.LoadLocation(zoneName)
-		if err != nil {
-			continue
-		}
-		printed++
-		t := referenceTime.In(loc)
-		if opts.ShowPath && opts.ZoneinfoRoot != "" {
-			fmt.Fprintf(stdout, "%s\t%s\n", filepath.Join(opts.ZoneinfoRoot, zoneName), t.Format(effectiveFormat))
-		} else {
-			fmt.Fprintf(stdout, "%-32s  %s\n", zoneName, t.Format(effectiveFormat))
-		}
-	}
-
-	if printed == 0 {
-		fmt.Fprintf(stderr, "No loadable timezone entries found for any of %q\n", querySummary)
+	if len(resp.Results) == 0 {
+		fmt.Fprintf(stderr, "No loadable timezone entries found for any of %q\n", resp.QuerySummary)
 		return 1
+	}
+
+	for _, match := range resp.Results {
+		if opts.ShowPath && opts.ZoneinfoRoot != "" {
+			fmt.Fprintf(stdout, "%s\t%s\n", match.DisplayName, match.FormattedTime)
+		} else {
+			fmt.Fprintf(stdout, "%-32s  %s\n", match.DisplayName, match.FormattedTime)
+		}
 	}
 
 	return 0
-}
-
-func collectMatches(entries []string, queryTerms []queryTerm, referenceTime time.Time) []string {
-	matches := make([]string, 0, len(entries))
-	for _, name := range entries {
-		lowerName := strings.ToLower(name)
-		normalizedName := normalizeForMatch(name)
-		zoneOffset, ok := zoneOffsetAt(name, referenceTime)
-		for _, term := range queryTerms {
-			if term.isOffset {
-				if ok && zoneOffset == term.offsetSeconds {
-					matches = append(matches, name)
-					break
-				}
-				continue
-			}
-
-			if strings.Contains(lowerName, term.raw) || strings.Contains(normalizedName, term.normalized) {
-				matches = append(matches, name)
-				break
-			}
-		}
-	}
-	return matches
 }
