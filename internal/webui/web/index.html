@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Witti — What Is The Time In</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"Helvetica Neue"', 'Arial', 'sans-serif'],
+          },
+          colors: {
+            apple: {
+              blue:       '#0071e3',
+              'blue-hov': '#0077ed',
+              gray:       '#f5f5f7',
+              'dark-bg':  '#000000',
+              'dark-sur': '#1d1d1f',
+            }
+          },
+          transitionProperty: {
+            'transform': 'transform',
+          }
+        }
+      }
+    }
+  </script>
+  <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
+
+  <style>
+    /* Spinner visibility controlled by HTMX request class */
+    .htmx-request #search-spinner { display: inline-block !important; }
+    .htmx-request #search-icon   { display: none !important; }
+    .htmx-request #search-btn    { opacity: 0.7; pointer-events: none; }
+
+    /* Subtle fade on results swap */
+    .htmx-swapping { opacity: 0; transition: opacity 0.15s ease; }
+    .htmx-settling  { opacity: 1; transition: opacity 0.25s ease; }
+
+    /* Custom ring on inputs */
+    input:focus, select:focus { outline: none; }
+
+    /* summary arrow */
+    details > summary { list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
+    details > summary .arrow { transition: transform 0.2s ease; }
+    details[open] > summary .arrow { transform: rotate(90deg); }
+  </style>
+</head>
+
+<body class="bg-white dark:bg-black min-h-screen font-sans antialiased transition-colors duration-300">
+
+  <!-- ─── Nav Bar ──────────────────────────────────────────────────────────── -->
+  <nav class="sticky top-0 z-50 backdrop-blur-xl bg-white/80 dark:bg-black/80 border-b border-gray-200/60 dark:border-gray-800/60">
+    <div class="max-w-5xl mx-auto px-6 h-12 flex items-center justify-between">
+      <span class="text-sm font-semibold text-gray-900 dark:text-white tracking-tight select-none">Witti</span>
+      <div class="flex items-center gap-5">
+        <a href="/v1/search"
+           class="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+           target="_blank" rel="noopener">API</a>
+        <a href="https://github.com/bytetwiddler/witti"
+           target="_blank" rel="noopener"
+           class="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">GitHub</a>
+        <!-- Dark-mode toggle -->
+        <button id="darkToggle"
+                aria-label="Toggle dark mode"
+                class="p-1 rounded-full text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-apple-blue ring-offset-2 dark:ring-offset-black">
+          <!-- sun -->
+          <svg id="icon-sun" class="w-4 h-4 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+          </svg>
+          <!-- moon -->
+          <svg id="icon-moon" class="w-4 h-4 dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ─── Hero ─────────────────────────────────────────────────────────────── -->
+  <section class="pt-24 pb-14 text-center px-6">
+    <h1 class="text-5xl sm:text-6xl lg:text-7xl font-semibold tracking-tight leading-tight text-gray-900 dark:text-white">
+      What Is The Time In
+    </h1>
+    <p class="mt-5 text-xl sm:text-2xl text-gray-500 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed font-light">
+      Instantly look up the current time in any timezone—or project a specific moment across the world.
+    </p>
+  </section>
+
+  <!-- ─── Search Card ───────────────────────────────────────────────────────── -->
+  <section class="max-w-2xl mx-auto px-6 pb-12">
+    <div class="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl shadow-gray-200/60 dark:shadow-black/40 border border-gray-100 dark:border-gray-800 p-8">
+
+      <form id="search-form"
+            hx-post="/ui/search"
+            hx-target="#results"
+            hx-swap="innerHTML transition:true"
+            hx-indicator="#search-form"
+            class="space-y-5">
+
+        <!-- ── Query input ── -->
+        <div>
+          <label for="query" class="block text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">
+            Timezone search
+          </label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+              <!-- Search icon -->
+              <svg id="search-icon" class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+              </svg>
+              <!-- Spinner -->
+              <svg id="search-spinner" style="display:none" class="w-5 h-5 text-apple-blue animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+            </div>
+            <input type="text" name="query" id="query"
+                   placeholder='los angeles  new york  "buenos aires"  tokyo  gmt-8'
+                   autocomplete="off" spellcheck="false" required
+                   class="w-full pl-12 pr-4 py-4 rounded-2xl text-base bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 border border-gray-200 dark:border-gray-700 focus:border-apple-blue focus:bg-white dark:focus:bg-gray-700 transition-all duration-200" />
+          </div>
+          <p class="mt-1.5 text-xs text-gray-400 dark:text-gray-600">
+            Space-separated terms · quote multi-word names · supports GMT±offset (e.g. <code class="font-mono">gmt-8</code>)
+          </p>
+        </div>
+
+        <!-- ── Advanced ── -->
+        <details class="group">
+          <summary class="flex items-center gap-1.5 cursor-pointer select-none text-sm font-medium text-apple-blue hover:opacity-80 transition-opacity w-fit">
+            <svg class="arrow w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+            </svg>
+            Advanced options
+          </summary>
+
+          <div class="mt-4 space-y-4 pl-5 border-l-2 border-gray-100 dark:border-gray-800">
+
+            <!-- Projected local time -->
+            <div>
+              <label for="localtime" class="block text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">
+                Project a local time
+              </label>
+              <input type="text" name="localtime" id="localtime"
+                     placeholder="MM/DD/YYYY HH:MM:SS — e.g. 02/17/2027 07:07:00"
+                     class="w-full px-4 py-3 rounded-xl text-sm bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 border border-gray-200 dark:border-gray-700 focus:border-apple-blue focus:bg-white dark:focus:bg-gray-700 transition-all duration-200" />
+              <p class="mt-1 text-xs text-gray-400 dark:text-gray-600">What time is this in the searched zones?</p>
+            </div>
+
+            <!-- My timezone -->
+            <div>
+              <label for="localzone" class="block text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">
+                My timezone
+              </label>
+              <input type="text" name="localzone" id="localzone"
+                     placeholder="e.g. America/Los_Angeles"
+                     class="w-full px-4 py-3 rounded-xl text-sm bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 border border-gray-200 dark:border-gray-700 focus:border-apple-blue focus:bg-white dark:focus:bg-gray-700 transition-all duration-200" />
+              <p class="mt-1 text-xs text-gray-400 dark:text-gray-600">Timezone of the projected time above</p>
+            </div>
+
+            <!-- Limit + 12-hour row -->
+            <div class="flex flex-wrap items-center gap-6">
+              <div>
+                <label for="limit" class="block text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">
+                  Max results
+                </label>
+                <select name="limit" id="limit"
+                        class="px-3 py-2 rounded-xl text-sm bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700 focus:border-apple-blue transition-all duration-200">
+                  <option value="0">All</option>
+                  <option value="1">1</option>
+                  <option value="5">5</option>
+                  <option value="10" selected>10</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                </select>
+              </div>
+              <label class="flex items-center gap-2.5 cursor-pointer mt-4">
+                <div class="relative">
+                  <input type="checkbox" name="use12hour" id="use12hour" class="sr-only peer" />
+                  <div class="w-10 h-6 rounded-full bg-gray-200 dark:bg-gray-700 peer-checked:bg-apple-blue transition-colors duration-200"></div>
+                  <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 peer-checked:translate-x-4"></div>
+                </div>
+                <span class="text-sm text-gray-600 dark:text-gray-400">12-hour clock (AM/PM)</span>
+              </label>
+            </div>
+
+          </div>
+        </details>
+
+        <!-- ── Submit ── -->
+        <button id="search-btn" type="submit"
+                class="w-full py-4 rounded-2xl bg-[#0071e3] hover:bg-[#0077ed] active:bg-[#006edb] text-white font-semibold text-base tracking-tight transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-[#0071e3] focus:ring-offset-2 dark:focus:ring-offset-gray-900 shadow-md shadow-blue-500/20">
+          Search
+        </button>
+
+      </form>
+    </div>
+  </section>
+
+  <!-- ─── Results ──────────────────────────────────────────────────────────── -->
+  <section id="results"
+           class="max-w-2xl mx-auto px-6 pb-24 space-y-3 transition-opacity duration-150">
+    <!-- HTMX populates this -->
+  </section>
+
+  <!-- ─── Footer ───────────────────────────────────────────────────────────── -->
+  <footer class="border-t border-gray-100 dark:border-gray-900 py-10 text-center">
+    <p class="text-xs text-gray-400 dark:text-gray-600">
+      Witti &mdash; World Time Lookup &mdash;
+      <a href="https://github.com/bytetwiddler/witti" target="_blank" rel="noopener"
+         class="underline underline-offset-2 hover:text-gray-600 dark:hover:text-gray-400 transition-colors">
+        GitHub
+      </a>
+      &mdash; MIT License
+    </p>
+  </footer>
+
+  <script>
+    // ── Dark mode: honour OS preference, persist user choice ──────────────────
+    (function () {
+      const saved = localStorage.getItem('witti-theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (saved === 'dark' || (!saved && prefersDark)) {
+        document.documentElement.classList.add('dark');
+      }
+    })();
+
+    document.getElementById('darkToggle').addEventListener('click', function () {
+      const isDark = document.documentElement.classList.toggle('dark');
+      localStorage.setItem('witti-theme', isDark ? 'dark' : 'light');
+    });
+
+    // ── Scroll results into view after HTMX swap ──────────────────────────────
+    document.body.addEventListener('htmx:afterSwap', function (e) {
+      if (e.detail.target.id === 'results') {
+        const el = document.getElementById('results');
+        if (el && el.children.length > 0) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+    });
+  </script>
+
+</body>
+</html>
+
