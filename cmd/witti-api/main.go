@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/bytetwiddler/witti/internal/httpapi"
+	"github.com/bytetwiddler/witti/v2/internal/httpapi"
 )
 
 func main() {

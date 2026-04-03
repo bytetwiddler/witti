@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bytetwiddler/witti"
+	"github.com/bytetwiddler/witti/v2"
 )
 
 func TestSearchEndpoint(t *testing.T) {
