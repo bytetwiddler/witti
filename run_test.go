@@ -56,13 +56,13 @@ func TestRun(t *testing.T) {
 			name:           "simple query",
 			args:           []string{"tokyo", "-limit", "1"},
 			wantCode:       0,
-			stdoutContains: []string{"Asia/Tokyo"},
+			stdoutContains: []string{"Asia/Tokyo", "GMT+9", "12:00:00 UTC"},
 		},
 		{
 			name:           "projected local datetime",
 			args:           []string{"02/17/2027 07:07:00", "new york", "-limit", "1"},
 			wantCode:       0,
-			stdoutContains: []string{"America/New_York", "10:07:00"},
+			stdoutContains: []string{"America/New_York", "10:07:00", "GMT-5", "15:07:00 UTC"},
 			stderrContains: []string{"info: projecting local time"},
 		},
 		{
@@ -76,6 +76,20 @@ func TestRun(t *testing.T) {
 			args:           []string{"gmt-7", "-limit", "2"},
 			wantCode:       0,
 			stderrContains: []string{"offset-aware mode active"},
+		},
+		{
+			name:     "gmt and utc detail lines 24h",
+			args:     []string{"new york", "-limit", "1"},
+			wantCode: 0,
+			// reference 2026-03-25 12:00 UTC; NYC=EDT=-4 → local 08:00
+			stdoutContains: []string{"America/New_York", "GMT-4", "12:00:00 UTC"},
+		},
+		{
+			name:     "gmt and utc detail lines 12h",
+			args:     []string{"new york", "-limit", "1", "-12h"},
+			wantCode: 0,
+			// GMT label is appended inline; UTC line uses 12-hour format
+			stdoutContains: []string{"America/New_York", "(GMT-4)", "12:00:00 PM UTC"},
 		},
 	}
 

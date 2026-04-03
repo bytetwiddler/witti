@@ -63,6 +63,30 @@ func TestZoneCandidatesDefaultList(t *testing.T) {
 	}
 }
 
+func TestAllZones(t *testing.T) {
+	zones, err := AllZones()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(zones) == 0 {
+		t.Fatal("expected non-empty zone list")
+	}
+	for i := 1; i < len(zones); i++ {
+		if zones[i] < zones[i-1] {
+			t.Fatalf("zones not sorted: %q before %q", zones[i-1], zones[i])
+		}
+	}
+	zoneSet := make(map[string]bool, len(zones))
+	for _, z := range zones {
+		zoneSet[z] = true
+	}
+	for _, want := range []string{"UTC", "America/Los_Angeles", "Europe/London"} {
+		if !zoneSet[want] {
+			t.Errorf("expected %q in AllZones results", want)
+		}
+	}
+}
+
 func TestZoneCandidatesInvalidRoot(t *testing.T) {
 	_, _, err := zoneCandidates("/no/such/path/xyz")
 	if err == nil {

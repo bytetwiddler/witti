@@ -13,6 +13,12 @@ import (
 const default24HourFormat = "Mon 2006-01-02 15:04:05 MST -07:00"
 const default12HourFormat = "Mon 2006-01-02 03:04:05 PM MST -07:00"
 
+// gmtUTCDetail* formats are used for the supplemental GMT-offset and UTC lines.
+// They intentionally omit the redundant numeric offset suffix (-07:00) since the
+// zone abbreviation (e.g. "GMT-7" or "UTC") already encodes the offset.
+const gmtUTCDetailFormat24h = "Mon 2006-01-02 15:04:05 MST"
+const gmtUTCDetailFormat12h = "Mon 2006-01-02 03:04:05 PM MST"
+
 // Run executes the CLI behavior with injectable dependencies for testing and reuse.
 func Run(args []string, stdout io.Writer, stderr io.Writer, now func() time.Time, local *time.Location) int {
 	if now == nil {
@@ -73,9 +79,11 @@ func Run(args []string, stdout io.Writer, stderr io.Writer, now func() time.Time
 
 	for _, match := range resp.Results {
 		if opts.ShowPath && opts.ZoneinfoRoot != "" {
-			fmt.Fprintf(stdout, "%s\t%s\n", match.DisplayName, match.FormattedTime)
+			fmt.Fprintf(stdout, "%s\t%s (%s)\n", match.DisplayName, match.FormattedTime, match.GMTLabel)
+			fmt.Fprintf(stdout, "\t%s\n", match.UTCTime)
 		} else {
-			fmt.Fprintf(stdout, "%-32s  %s\n", match.DisplayName, match.FormattedTime)
+			fmt.Fprintf(stdout, "%-32s  %s (%s)\n", match.DisplayName, match.FormattedTime, match.GMTLabel)
+			fmt.Fprintf(stdout, "%-32s  %s\n", "", match.UTCTime)
 		}
 	}
 

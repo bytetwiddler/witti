@@ -113,7 +113,20 @@ components:
           format: date-time
         formattedTime:
           type: string
+          description: Local time formatted with the requested format (includes numeric offset suffix).
           example: Wed 2027-02-17 10:07:00 EST -05:00
+        gmtLabel:
+          type: string
+          description: >
+            Compact current UTC offset label, e.g. "GMT-5". Changes with DST (GMT-7 in LA
+            during summer, GMT-8 in winter). Intended to be appended to formattedTime:
+            "10:07:00 EST -05:00 (GMT-5)".
+          example: GMT-5
+        utcTime:
+          type: string
+          description: >
+            Same instant in UTC. Stable across DST and seasonal changes.
+          example: Wed 2027-02-17 15:07:00 UTC
         utcOffsetSeconds:
           type: integer
           format: int32

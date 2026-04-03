@@ -61,6 +61,21 @@ Executes the same timezone search/projection logic as the CLI.
 - `limit` (optional): max number of returned results.
 - `showPath` (optional): include zoneinfo path in `displayName` when `zoneinfoRoot` is set.
 
+### Result fields (`SearchMatch`)
+
+Each entry in `results` contains:
+
+| Field | Description |
+|---|---|
+| `zoneName` | IANA timezone name, e.g. `America/New_York` |
+| `displayName` | Same as `zoneName` (or full path when `showPath` is set) |
+| `time` | The matched instant as an RFC-3339 timestamp |
+| `formattedTime` | Local time formatted according to `format` / `use12Hour` (includes numeric offset suffix) |
+| `gmtLabel` | Compact current UTC offset label, e.g. `GMT-5`. Changes with DST — `GMT-7` in LA during summer, `GMT-8` in winter. Intended to be appended to `formattedTime` for display: `10:07:00 EST -05:00 (GMT-5)` |
+| `utcTime` | Same instant in UTC — stable across DST and seasonal changes |
+| `utcOffsetSeconds` | Current UTC offset in seconds (positive = ahead of UTC) |
+| `abbreviation` | Timezone abbreviation, e.g. `EST`, `PDT` |
+
 ### Successful response
 
 - `200 OK`
@@ -79,6 +94,8 @@ Executes the same timezone search/projection logic as the CLI.
         "displayName": "America/New_York",
         "time": "2027-02-17T10:07:00-05:00",
         "formattedTime": "Wed 2027-02-17 10:07:00 EST -05:00",
+        "gmtLabel": "GMT-5",
+        "utcTime": "Wed 2027-02-17 15:07:00 UTC",
         "utcOffsetSeconds": -18000,
         "abbreviation": "EST"
       }

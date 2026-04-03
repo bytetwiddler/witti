@@ -5,13 +5,13 @@ package webui
 
 import (
 	"embed"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/bytetwiddler/witti"
 )
@@ -68,6 +68,24 @@ func NewHandler(now func() time.Time, local *time.Location) http.Handler {
 
 	mux := http.NewServeMux()
 
+	// ── API docs ─────────────────────────────────────────────────────────────
+	mux.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		renderAPIGuidePage(w)
+	})
+	mux.HandleFunc("/api.md", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+		_, _ = w.Write([]byte(witti.APIGuideMarkdown()))
+	})
+
 	// ── Static SPA ──────────────────────────────────────────────────────────
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
@@ -80,7 +98,24 @@ func NewHandler(now func() time.Time, local *time.Location) http.Handler {
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 		_, _ = w.Write(data)
+	})
+
+	// ── Zones list — drives the "My timezone" datalist autocomplete ─────────
+	mux.HandleFunc("/ui/zones", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		zones, err := witti.AllZones()
+		if err != nil {
+			http.Error(w, "could not list zones", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "public, max-age=86400") // zone list rarely changes
+		_ = json.NewEncoder(w).Encode(zones)
 	})
 
 	// ── HTMX search fragment ─────────────────────────────────────────────────
@@ -171,7 +206,7 @@ func tokenizeQuery(s string) []string {
 		switch {
 		case r == '"':
 			inQuote = !inQuote
-		case unicode.IsSpace(r) && !inQuote:
+		case isASCIISpace(r) && !inQuote:
 			if cur.Len() > 0 {
 				tokens = append(tokens, cur.String())
 				cur.Reset()
@@ -184,6 +219,15 @@ func tokenizeQuery(s string) []string {
 		tokens = append(tokens, cur.String())
 	}
 	return tokens
+}
+
+func isASCIISpace(r rune) bool {
+	switch r {
+	case ' ', '\t', '\n', '\r', '\v', '\f':
+		return true
+	default:
+		return false
+	}
 }
 
 // ── HTMX result fragment template ───────────────────────────────────────────
@@ -243,13 +287,16 @@ const resultsHTML = `
             hover:-translate-y-0.5
             transition-all duration-200 cursor-default">
   <div class="flex items-start justify-between gap-4">
-    <!-- Left: time -->
+    <!-- Left: time lines -->
     <div class="flex-1 min-w-0">
       <p class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2 truncate">
         {{.ZoneName}}
       </p>
-      <p class="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white tracking-tight leading-snug break-all">
-        {{.FormattedTime}}
+      <p class="text-base font-medium text-gray-900 dark:text-white tracking-tight leading-snug break-all">
+        {{.FormattedTime}} <span class="text-sm font-mono text-gray-400 dark:text-gray-500">({{.GMTLabel}})</span>
+      </p>
+      <p class="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400 tracking-tight leading-snug break-all">
+        {{.UTCTime}}
       </p>
     </div>
     <!-- Right: badge + offset -->
@@ -268,4 +315,3 @@ const resultsHTML = `
 {{- end}}
 {{- end}}
 `
-

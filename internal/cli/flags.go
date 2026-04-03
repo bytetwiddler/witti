@@ -27,19 +27,19 @@ func NewFlagSet(stderr io.Writer, defaultFormat string) (*flag.FlagSet, *Options
 	fs.BoolVar(&opts.ShowPath, "showpath", false, "show full filesystem path (only when -zoneinfo is set)")
 
 	fs.Usage = func() {
-		fmt.Fprintf(stderr, `whattime - search IANA timezone names and print current times
+		fmt.Fprintf(stderr, `witti - search IANA timezone names and print current times
 
 Usage:
-  whattime <substring...> [options]
+  witti <substring...> [options]
 
 Examples:
-  whattime -limit 5 tokyo
-  whattime Paris
-  whattime "buenos aires" "new york" Anchorage
-  whattime "02/17/2027 07:07:00" "new york"
-  whattime tokyo -12h
-  whattime america
-  whattime tokyo -format "2006-01-02 15:04 MST"
+  witti -limit 5 tokyo
+  witti Paris
+  witti "buenos aires" "new york" Anchorage
+  witti "02/17/2027 07:07:00" "new york"
+  witti tokyo -12h
+  witti america
+  witti tokyo -format "2006-01-02 15:04 MST"
 
 Options:
 `)
