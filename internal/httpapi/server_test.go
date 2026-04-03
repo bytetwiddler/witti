@@ -48,6 +48,21 @@ func TestSearchEndpoint(t *testing.T) {
 	if payload.Data.Results[0].ZoneName != "America/New_York" {
 		t.Fatalf("unexpected zone: %s", payload.Data.Results[0].ZoneName)
 	}
+	r0 := payload.Data.Results[0]
+	if r0.GMTLabel == "" {
+		t.Fatalf("expected GMTLabel to be populated, got empty string")
+	}
+	if r0.UTCTime == "" {
+		t.Fatalf("expected UTCTime to be populated, got empty string")
+	}
+	// Feb 2027: NYC=EST=UTC-5; compact label must be "GMT-5"
+	if r0.GMTLabel != "GMT-5" {
+		t.Fatalf("expected GMTLabel=GMT-5, got %q", r0.GMTLabel)
+	}
+	// UTC representation of the projected instant
+	if !strings.Contains(r0.UTCTime, "UTC") {
+		t.Fatalf("expected UTC in UTCTime, got %q", r0.UTCTime)
+	}
 }
 
 func TestSearchEndpointBadRequest(t *testing.T) {
@@ -130,4 +145,3 @@ func TestHealthz(t *testing.T) {
 		}
 	})
 }
-

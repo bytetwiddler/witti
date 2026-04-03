@@ -142,4 +142,3 @@ var defaultZoneNames = []string{
 	"Etc/GMT-13",
 	"Etc/GMT-14",
 }
-

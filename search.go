@@ -27,6 +27,8 @@ type SearchMatch struct {
 	DisplayName      string    `json:"displayName"`
 	Time             time.Time `json:"time"`
 	FormattedTime    string    `json:"formattedTime"`
+	GMTLabel         string    `json:"gmtLabel"`
+	UTCTime          string    `json:"utcTime"`
 	UTCOffsetSeconds int       `json:"utcOffsetSeconds"`
 	Abbreviation     string    `json:"abbreviation"`
 }
@@ -103,6 +105,12 @@ func Search(req SearchRequest, now func() time.Time, local *time.Location) (Sear
 		effectiveFormat = default24HourFormat
 	}
 
+	// Detail format for the supplemental GMT-offset and UTC lines.
+	detailFmt := gmtUTCDetailFormat24h
+	if req.Use12Hour {
+		detailFmt = gmtUTCDetailFormat12h
+	}
+
 	entries, sourceDesc, err := zoneCandidates(req.ZoneinfoRoot)
 	if err != nil {
 		return SearchResponse{}, err
@@ -143,6 +151,8 @@ func Search(req SearchRequest, now func() time.Time, local *time.Location) (Sear
 			DisplayName:      displayName,
 			Time:             t,
 			FormattedTime:    t.Format(effectiveFormat),
+			GMTLabel:         gmtOffsetName(offset),
+			UTCTime:          t.UTC().Format(detailFmt),
 			UTCOffsetSeconds: offset,
 			Abbreviation:     abbr,
 		})
@@ -173,3 +183,35 @@ func collectMatches(entries []string, queryTerms []queryTerm, referenceTime time
 	}
 	return matches
 }
+
+// AllZones returns the complete sorted list of discoverable IANA timezone names
+// using the built-in tzdata (no custom zoneinfo root).
+func AllZones() ([]string, error) {
+	zones, _, err := zoneCandidates("")
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(zones)
+	return zones, nil
+}
+
+// gmtOffsetName converts an offset in seconds to a compact "GMT±N" zone-name label.
+// The label is used with time.FixedZone so Go's time-format MST verb renders the
+// expected string, e.g. "GMT-7" or "GMT+5:30".
+func gmtOffsetName(offsetSeconds int) string {
+	if offsetSeconds == 0 {
+		return "GMT"
+	}
+	sign := "+"
+	if offsetSeconds < 0 {
+		sign = "-"
+		offsetSeconds = -offsetSeconds
+	}
+	hours := offsetSeconds / 3600
+	minutes := (offsetSeconds % 3600) / 60
+	if minutes == 0 {
+		return fmt.Sprintf("GMT%s%d", sign, hours)
+	}
+	return fmt.Sprintf("GMT%s%d:%02d", sign, hours, minutes)
+}
+

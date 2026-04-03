@@ -1,6 +1,7 @@
 package webui
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -38,8 +39,12 @@ func TestIndexHTML(t *testing.T) {
 	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
 		t.Fatalf("unexpected Content-Type: %s", ct)
 	}
-	if !strings.Contains(rec.Body.String(), "What Is The Time In") {
+	body := rec.Body.String()
+	if !strings.Contains(body, "What Is The Time In") {
 		t.Fatal("index.html missing hero text")
+	}
+	if !strings.Contains(body, `href="/api"`) {
+		t.Fatal("index.html missing API docs link")
 	}
 }
 
@@ -52,6 +57,66 @@ func TestIndexNotFound(t *testing.T) {
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", rec.Code)
+	}
+}
+
+func TestAPIGuidePage(t *testing.T) {
+	h := newTestHandler(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
+		t.Fatalf("unexpected Content-Type: %s", ct)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "Witti API Guide") {
+		t.Fatalf("expected API guide title: %s", body)
+	}
+	if !strings.Contains(body, "POST /v1/search") {
+		t.Fatalf("expected search endpoint docs: %s", body)
+	}
+	if !strings.Contains(body, "Rendered from the embedded") {
+		t.Fatalf("expected footer note: %s", body)
+	}
+}
+
+func TestAPIGuideRawMarkdown(t *testing.T) {
+	h := newTestHandler(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api.md", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api.md status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/markdown") {
+		t.Fatalf("unexpected Content-Type: %s", ct)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "# witti REST API") {
+		t.Fatalf("expected markdown heading: %s", body)
+	}
+	if !strings.Contains(body, "## `POST /v1/search`") {
+		t.Fatalf("expected markdown endpoint section: %s", body)
+	}
+}
+
+func TestAPIGuideMethodNotAllowed(t *testing.T) {
+	h := newTestHandler(t)
+
+	for _, path := range []string{"/api", "/api.md"} {
+		req := httptest.NewRequest(http.MethodPost, path, nil)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != http.StatusMethodNotAllowed {
+			t.Fatalf("POST %s: expected 405, got %d", path, rec.Code)
+		}
 	}
 }
 
@@ -69,7 +134,7 @@ func postSearch(t *testing.T, h http.Handler, form url.Values) *httptest.Respons
 func TestSearchBasic(t *testing.T) {
 	h := newTestHandler(t)
 
-	rec := postSearch(t, h, url.Values{"query": {"new york"}, "limit": {"1"}})
+	rec := postSearch(t, h, url.Values{"query": []string{"new york"}, "limit": []string{"1"}})
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
@@ -78,12 +143,21 @@ func TestSearchBasic(t *testing.T) {
 	if !strings.Contains(body, "New_York") {
 		t.Fatalf("expected New_York in body, got: %s", body)
 	}
+	if !strings.Contains(body, "GMT-4") {
+		t.Fatalf("expected GMT detail line in body, got: %s", body)
+	}
+	if !strings.Contains(body, "12:00:00 UTC") {
+		t.Fatalf("expected UTC detail line in body, got: %s", body)
+	}
+	if !strings.Contains(body, "text-sm font-medium text-gray-500") {
+		t.Fatalf("expected muted UTC styling in body, got: %s", body)
+	}
 }
 
 func TestSearchMultipleTerms(t *testing.T) {
 	h := newTestHandler(t)
 
-	rec := postSearch(t, h, url.Values{"query": {"los angeles new york"}, "limit": {"2"}})
+	rec := postSearch(t, h, url.Values{"query": []string{"los angeles new york"}, "limit": []string{"2"}})
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
@@ -101,10 +175,10 @@ func TestSearchProjectedTime(t *testing.T) {
 	h := newTestHandler(t)
 
 	rec := postSearch(t, h, url.Values{
-		"query":     {"new york"},
-		"localtime": {"02/17/2027 07:07:00"},
-		"localzone": {"America/Los_Angeles"},
-		"limit":     {"1"},
+		"query":     []string{"new york"},
+		"localtime": []string{"02/17/2027 07:07:00"},
+		"localzone": []string{"America/Los_Angeles"},
+		"limit":     []string{"1"},
 	})
 
 	if rec.Code != http.StatusOK {
@@ -118,15 +192,21 @@ func TestSearchProjectedTime(t *testing.T) {
 	if !strings.Contains(body, "10:07") {
 		t.Fatalf("expected 10:07 in projected result: %s", body)
 	}
+	if !strings.Contains(body, "GMT-5") {
+		t.Fatalf("expected projected GMT detail line: %s", body)
+	}
+	if !strings.Contains(body, "15:07:00 UTC") {
+		t.Fatalf("expected projected UTC detail line: %s", body)
+	}
 }
 
 func TestSearch12HourClock(t *testing.T) {
 	h := newTestHandler(t)
 
 	rec := postSearch(t, h, url.Values{
-		"query":     {"london"},
-		"limit":     {"1"},
-		"use12hour": {"on"},
+		"query":     []string{"new york"},
+		"limit":     []string{"1"},
+		"use12hour": []string{"on"},
 	})
 
 	if rec.Code != http.StatusOK {
@@ -137,12 +217,19 @@ func TestSearch12HourClock(t *testing.T) {
 	if !strings.Contains(body, "AM") && !strings.Contains(body, "PM") {
 		t.Fatalf("expected AM/PM in 12-hour result: %s", body)
 	}
+	// GMT label is appended inline on the local time line
+	if !strings.Contains(body, "(GMT-4)") {
+		t.Fatalf("expected (GMT-4) inline label in 12-hour result: %s", body)
+	}
+	if !strings.Contains(body, "12:00:00 PM UTC") {
+		t.Fatalf("expected UTC detail line to honor 12-hour format: %s", body)
+	}
 }
 
 func TestSearchGMTOffset(t *testing.T) {
 	h := newTestHandler(t)
 
-	rec := postSearch(t, h, url.Values{"query": {"gmt-8"}, "limit": {"5"}})
+	rec := postSearch(t, h, url.Values{"query": []string{"gmt-8"}, "limit": []string{"5"}})
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
@@ -157,7 +244,7 @@ func TestSearchGMTOffset(t *testing.T) {
 func TestSearchNoMatches(t *testing.T) {
 	h := newTestHandler(t)
 
-	rec := postSearch(t, h, url.Values{"query": {"zzznomatchzzz"}})
+	rec := postSearch(t, h, url.Values{"query": []string{"zzznomatchzzz"}})
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
@@ -171,8 +258,8 @@ func TestSearchInvalidProjectedTime(t *testing.T) {
 	h := newTestHandler(t)
 
 	rec := postSearch(t, h, url.Values{
-		"query":     {"tokyo"},
-		"localtime": {"not-a-date"},
+		"query":     []string{"tokyo"},
+		"localtime": []string{"not-a-date"},
 	})
 
 	if rec.Code != http.StatusOK {
@@ -254,6 +341,59 @@ func TestNewHandlerNilGuards(t *testing.T) {
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("nil-guard handler: status=%d", rec.Code)
+	}
+}
+
+// ── GET /ui/zones ─────────────────────────────────────────────────────────────
+
+func TestZonesEndpoint(t *testing.T) {
+	h := newTestHandler(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/ui/zones", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /ui/zones status=%d", rec.Code)
+	}
+	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+		t.Fatalf("unexpected Content-Type: %s", ct)
+	}
+	var zones []string
+	if err := json.Unmarshal(rec.Body.Bytes(), &zones); err != nil {
+		t.Fatalf("decode /ui/zones: %v", err)
+	}
+	if len(zones) == 0 {
+		t.Fatal("expected non-empty zones list")
+	}
+	// List must be sorted
+	for i := 1; i < len(zones); i++ {
+		if zones[i] < zones[i-1] {
+			t.Fatalf("zones not sorted: %q before %q", zones[i-1], zones[i])
+		}
+	}
+	// Well-known zone must be present
+	found := false
+	for _, z := range zones {
+		if z == "America/Los_Angeles" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("America/Los_Angeles missing from /ui/zones")
+	}
+}
+
+func TestZonesEndpointMethodNotAllowed(t *testing.T) {
+	h := newTestHandler(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/ui/zones", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d", rec.Code)
 	}
 }
 

@@ -49,6 +49,17 @@
     details > summary::-webkit-details-marker { display: none; }
     details > summary .arrow { transition: transform 0.2s ease; }
     details[open] > summary .arrow { transform: rotate(90deg); }
+
+    /* Hero title — explicit sizes so Tailwind CDN cannot interfere */
+    #hero-title    { font-size: 1.5rem;   line-height: 1.25; }
+    #hero-subtitle { font-size: 0.875rem; line-height: 1.6;  }
+    @media (min-width: 640px)  {
+      #hero-title    { font-size: 1.875rem; }
+      #hero-subtitle { font-size: 1rem;     }
+    }
+    @media (min-width: 1024px) {
+      #hero-title { font-size: 2.25rem; }
+    }
   </style>
 </head>
 
@@ -59,7 +70,7 @@
     <div class="max-w-5xl mx-auto px-6 h-12 flex items-center justify-between">
       <span class="text-sm font-semibold text-gray-900 dark:text-white tracking-tight select-none">Witti</span>
       <div class="flex items-center gap-5">
-        <a href="/v1/search"
+        <a href="/api"
            class="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
            target="_blank" rel="noopener">API</a>
         <a href="https://github.com/bytetwiddler/witti"
@@ -85,11 +96,11 @@
   </nav>
 
   <!-- ─── Hero ─────────────────────────────────────────────────────────────── -->
-  <section class="pt-24 pb-14 text-center px-6">
-    <h1 class="text-5xl sm:text-6xl lg:text-7xl font-semibold tracking-tight leading-tight text-gray-900 dark:text-white">
+  <section class="pt-12 pb-8 text-center px-6">
+    <h1 id="hero-title" class="font-semibold tracking-tight leading-tight text-gray-900 dark:text-white">
       What Is The Time In
     </h1>
-    <p class="mt-5 text-xl sm:text-2xl text-gray-500 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed font-light">
+    <p id="hero-subtitle" class="mt-3 text-gray-500 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed font-light">
       Instantly look up the current time in any timezone—or project a specific moment across the world.
     </p>
   </section>
@@ -129,7 +140,7 @@
                    autocomplete="off" spellcheck="false" required
                    class="w-full pl-12 pr-4 py-4 rounded-2xl text-base bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 border border-gray-200 dark:border-gray-700 focus:border-apple-blue focus:bg-white dark:focus:bg-gray-700 transition-all duration-200" />
           </div>
-          <p class="mt-1.5 text-xs text-gray-400 dark:text-gray-600">
+          <p class="mt-1.5 text-xs text-gray-400 dark:text-gray-400">
             Space-separated terms · quote multi-word names · supports GMT±offset (e.g. <code class="font-mono">gmt-8</code>)
           </p>
         </div>
@@ -153,18 +164,20 @@
               <input type="text" name="localtime" id="localtime"
                      placeholder="MM/DD/YYYY HH:MM:SS — e.g. 02/17/2027 07:07:00"
                      class="w-full px-4 py-3 rounded-xl text-sm bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 border border-gray-200 dark:border-gray-700 focus:border-apple-blue focus:bg-white dark:focus:bg-gray-700 transition-all duration-200" />
-              <p class="mt-1 text-xs text-gray-400 dark:text-gray-600">What time is this in the searched zones?</p>
+              <p class="mt-1 text-xs text-gray-400 dark:text-gray-400">What time is this in the searched zones?</p>
             </div>
 
-            <!-- My timezone -->
-            <div>
+            <!-- My timezone — revealed only when "Project a local time" is filled -->
+            <div id="localzone-group" class="hidden">
               <label for="localzone" class="block text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">
-                My timezone
+                Timezone of the projected time
               </label>
               <input type="text" name="localzone" id="localzone"
-                     placeholder="e.g. America/Los_Angeles"
+                     placeholder="e.g. America/Los_Angeles — type to filter"
+                     list="zone-list"
+                     autocomplete="off" spellcheck="false"
                      class="w-full px-4 py-3 rounded-xl text-sm bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 border border-gray-200 dark:border-gray-700 focus:border-apple-blue focus:bg-white dark:focus:bg-gray-700 transition-all duration-200" />
-              <p class="mt-1 text-xs text-gray-400 dark:text-gray-600">Timezone of the projected time above</p>
+              <datalist id="zone-list"></datalist>
             </div>
 
             <!-- Limit + 12-hour row -->
@@ -214,7 +227,7 @@
 
   <!-- ─── Footer ───────────────────────────────────────────────────────────── -->
   <footer class="border-t border-gray-100 dark:border-gray-900 py-10 text-center">
-    <p class="text-xs text-gray-400 dark:text-gray-600">
+    <p class="text-xs text-gray-400 dark:text-gray-400">
       Witti &mdash; World Time Lookup &mdash;
       <a href="https://github.com/bytetwiddler/witti" target="_blank" rel="noopener"
          class="underline underline-offset-2 hover:text-gray-600 dark:hover:text-gray-400 transition-colors">
@@ -248,6 +261,47 @@
         }
       }
     });
+    // ── My timezone: show only when "Project a local time" has a value ───────
+    (function () {
+      var localtimeEl  = document.getElementById('localtime');
+      var localzoneGrp = document.getElementById('localzone-group');
+      var localzoneEl  = document.getElementById('localzone');
+      var zoneList     = document.getElementById('zone-list');
+      var zonesLoaded  = false;
+
+      function loadZones() {
+        if (zonesLoaded) return;
+        zonesLoaded = true;
+        fetch('/ui/zones')
+          .then(function (r) { return r.json(); })
+          .then(function (zones) {
+            var frag = document.createDocumentFragment();
+            zones.forEach(function (z) {
+              var opt = document.createElement('option');
+              opt.value = z;
+              frag.appendChild(opt);
+            });
+            zoneList.appendChild(frag);
+          })
+          .catch(function () {}); // fail silently — datalist degrades to plain text input
+      }
+
+      function syncVisibility() {
+        if (localtimeEl && localtimeEl.value.trim()) {
+          localzoneGrp.classList.remove('hidden');
+          loadZones();
+        } else {
+          localzoneGrp.classList.add('hidden');
+          if (localzoneEl) localzoneEl.value = '';
+        }
+      }
+
+      if (localtimeEl) {
+        localtimeEl.addEventListener('input', syncVisibility);
+        localtimeEl.addEventListener('change', syncVisibility); // handle autofill
+        syncVisibility(); // run once on load in case browser restored a value
+      }
+    })();
   </script>
 
 </body>
