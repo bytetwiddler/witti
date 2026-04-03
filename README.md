@@ -29,15 +29,15 @@
 
 Download the binary for your platform from the [Releases](../../releases) page.
 
-| Platform | Binary |
-|---|---|
-| Linux x86-64 | `witti-linux-amd64` |
-| Linux ARM64 | `witti-linux-arm64` |
-| macOS Intel | `witti-darwin-amd64` |
-| macOS Apple Silicon | `witti-darwin-arm64` |
-| Windows x86-64 | `witti-windows-amd64.exe` |
-| Windows ARM64 | `witti-windows-arm64.exe` |
-| FreeBSD x86-64 | `witti-freebsd-amd64` |
+| Platform            | Binary                    |
+| ------------------- | ------------------------- |
+| Linux x86-64        | `witti-linux-amd64`       |
+| Linux ARM64         | `witti-linux-arm64`       |
+| macOS Intel         | `witti-darwin-amd64`      |
+| macOS Apple Silicon | `witti-darwin-arm64`      |
+| Windows x86-64      | `witti-windows-amd64.exe` |
+| Windows ARM64       | `witti-windows-arm64.exe` |
+| FreeBSD x86-64      | `witti-freebsd-amd64`     |
 
 ### Build from source
 
@@ -61,13 +61,13 @@ witti <query...> [options]
 
 ### Options
 
-| Flag | Default | Description |
-|---|---|---|
-| `-12h` | off | Use 12-hour (AM/PM) clock output |
-| `-format <string>` | `Mon 2006-01-02 15:04:05 MST -07:00` | Go time format string |
-| `-limit <n>` | `0` (no limit) | Cap number of results |
-| `-showpath` | off | Show full zoneinfo path (requires `-zoneinfo`) |
-| `-zoneinfo <path>` | built-in | Override IANA timezone data root for discovery |
+| Flag               | Default                              | Description                                    |
+| ------------------ | ------------------------------------ | ---------------------------------------------- |
+| `-12h`             | off                                  | Use 12-hour (AM/PM) clock output               |
+| `-format <string>` | `Mon 2006-01-02 15:04:05 MST -07:00` | Go time format string                          |
+| `-limit <n>`       | `0` (no limit)                       | Cap number of results                          |
+| `-showpath`        | off                                  | Show full zoneinfo path (requires `-zoneinfo`) |
+| `-zoneinfo <path>` | built-in                             | Override IANA timezone data root for discovery |
 
 ## Web UI (SPA)
 
@@ -206,13 +206,13 @@ America/Vancouver                 Wed 2026-03-25 12:40:39 PDT -07:00
 
 Supported offset formats:
 
-| Input | Interpreted as |
-|---|---|
-| `gmt-7` | UTC−07:00 |
-| `gmt-7:07` | UTC−07:07 |
-| `gmt-07:07` | UTC−07:07 |
-| `gmt+5:30` | UTC+05:30 |
-| `gmt+0530` | UTC+05:30 |
+| Input       | Interpreted as |
+| ----------- | -------------- |
+| `gmt-7`     | UTC−07:00      |
+| `gmt-7:07`  | UTC−07:07      |
+| `gmt-07:07` | UTC−07:07      |
+| `gmt+5:30`  | UTC+05:30      |
+| `gmt+0530`  | UTC+05:30      |
 
 > **Note on DST/date:** offset matching is evaluated at the moment the command runs (or at the projected instant when you pass a datetime argument). A zone such as `America/Los_Angeles` appears in `gmt-7` results during summer (PDT) and in `gmt-8` results during winter (PST).
 
@@ -293,41 +293,51 @@ make clean
 ## Project structure
 
 ```
-witti/
-├── cmd/
-│   └── witti/
-│       └── main.go        # Thin CLI entry point
-│   └── witti-api/
-│       └── main.go        # REST API entry point
-│   └── witti-web/
-│       └── main.go        # Web UI + API entry point
-├── internal/
-│   └── cli/
-│       ├── flags.go       # CLI-only flag wiring and arg reordering
-│       └── flags_test.go
-│   └── httpapi/
-│       ├── server.go      # REST API HTTP handlers
-│       └── server_test.go
-│   └── webui/
-│       ├── server.go      # SPA + HTMX handlers and HTML fragments
-│       ├── server_test.go
-│       └── web/
-│           └── index.html # Embedded Tailwind + HTMX single-page app
-├── witti.go       # Library entry point and run orchestration
-├── search.go      # Exported structured search API
-├── query.go       # Query and GMT-offset parsing
-├── datetime.go    # Projected local datetime parsing
-├── match.go       # Matching and normalization helpers
-├── zones_fs.go    # Filesystem-based zone discovery
-├── zones_source.go
-├── zones_default.go # Built-in IANA zone name list
-├── query_test.go
-├── datetime_test.go
-├── zones_test.go
-├── run_test.go     # Run orchestration and end-to-end behavior tests
-├── Makefile       # Build, cross-compile, test, and clean targets
-├── go.mod
-└── README.md
+witti
+|-- LICENSE
+|-- Makefile
+|-- README.md
+|-- api.md
+|-- api_embed.go
+|-- cmd/
+|   |-- witti/
+|   |   `-- main.go
+|   |-- witti-api/
+|   |   `-- main.go
+|   `-- witti-web/
+|       `-- main.go
+|-- datetime.go
+|-- datetime_test.go
+|-- errors.go
+|-- go.mod
+|-- go.sum
+|-- internal/
+|   |-- cli/
+|   |   |-- flags.go
+|   |   `-- flags_test.go
+|   |-- httpapi/
+|   |   |-- server.go
+|   |   `-- server_test.go
+|   `-- webui/
+|       |-- docs.go
+|       |-- server.go
+|       |-- server_test.go
+|       `-- web/
+|           `-- index.html
+|-- match.go
+|-- openapi.yaml
+|-- query.go
+|-- query_test.go
+|-- run_test.go
+|-- search.go
+|-- witti-api.exe
+|-- witti-web.exe
+|-- witti.exe
+|-- witti.go
+|-- zones_default.go
+|-- zones_fs.go
+|-- zones_source.go
+`-- zones_test.go
 ```
 
 ---
