@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bytetwiddler/witti"
+	"github.com/bytetwiddler/witti/v2"
 )
 
 //go:embed web

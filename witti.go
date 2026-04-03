@@ -7,7 +7,7 @@ import (
 	"time"
 	_ "time/tzdata"
 
-	"github.com/bytetwiddler/witti/internal/cli"
+	"github.com/bytetwiddler/witti/v2/internal/cli"
 )
 
 const default24HourFormat = "Mon 2006-01-02 15:04:05 MST -07:00"

@@ -5,7 +5,7 @@ import (
 	"html/template"
 	"net/http"
 
-	"github.com/bytetwiddler/witti"
+	"github.com/bytetwiddler/witti/v2"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	gmhtml "github.com/yuin/goldmark/renderer/html"
@@ -212,4 +212,3 @@ func renderAPIGuidePage(w http.ResponseWriter) {
 		http.Error(w, "could not render API guide page", http.StatusInternalServerError)
 	}
 }
-
