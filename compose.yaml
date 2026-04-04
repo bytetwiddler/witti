@@ -1,0 +1,23 @@
+services:
+
+  # Combined web SPA + REST API server
+  witti-web:
+    build:
+      context: .
+      args:
+        TARGET: witti-web
+    image: witti-web:latest
+    container_name: witti-web
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -fs http://localhost:8080/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+

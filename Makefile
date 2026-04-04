@@ -2,6 +2,13 @@ APP      := witti
 API_APP  := witti-api
 WEB_APP  := witti-web
 
+# ── Container settings ────────────────────────────────────────────────────────
+IMAGE        := witti-web
+IMAGE_TAG    := latest
+COMPOSE_FILE := compose.yaml
+PODMAN       := podman
+COMPOSE      := podman-compose
+
 MAKEFLAGS += -j4
 
 ifeq ($(OS),Windows_NT)
@@ -46,7 +53,9 @@ else
   endef
 endif
 
-.PHONY: help build build-api build-web build-all run run-api run-web test test-coverage test-verbose test-all clean
+.PHONY: help build build-api build-web build-all run run-api run-web \
+        test test-coverage test-verbose test-all clean \
+        image-build up down logs ps shell shell-root image-clean
 
 help:
 	@echo "Targets:"
@@ -62,6 +71,15 @@ help:
 	@echo "  test-verbose   Run tests verbosely"
 	@echo "  test-all       Run verbose and coverage tests"
 	@echo "  clean          Remove built executables"
+	@echo ""
+	@echo "  image-build    Build the $(IMAGE):$(IMAGE_TAG) container image with podman"
+	@echo "  up             Start services with podman compose (detached)"
+	@echo "  down           Stop and remove services"
+	@echo "  logs           Follow container logs (ARGS='--tail 50' to tail last 50 lines)"
+	@echo "  ps             List running compose services"
+	@echo "  shell          Open a shell inside the running witti-web container (as witti)"
+	@echo "  shell-root     Open a root shell inside the running witti-web container"
+	@echo "  image-clean    Remove the $(IMAGE):$(IMAGE_TAG) image from local storage"
 
 build:
 	go build -o "$(BIN)" ./cmd/witti
@@ -122,3 +140,38 @@ clean:
 	$(RM_API_BIN)
 	$(RM_WEB_BIN)
 	$(RM_BIN_DIR)
+
+# ── Podman targets ────────────────────────────────────────────────────────────
+
+## Build (or rebuild) the container image
+image-build:
+	$(PODMAN) build -t $(IMAGE):$(IMAGE_TAG) .
+
+## Start all services in the background
+up:
+	$(COMPOSE) -f $(COMPOSE_FILE) up -d $(ARGS)
+
+## Stop and remove containers (data volumes are preserved)
+down:
+	$(COMPOSE) -f $(COMPOSE_FILE) down $(ARGS)
+
+## Follow logs for the witti-web container (pass ARGS='--tail 50' to limit lines)
+logs:
+	$(PODMAN) logs -f $(ARGS) witti-web
+
+## Show running compose services
+ps:
+	$(COMPOSE) -f $(COMPOSE_FILE) ps
+
+## Open an interactive shell inside the running witti-web container (as witti)
+shell:
+	$(PODMAN) exec -it witti-web /bin/bash
+
+## Open a root shell inside the running witti-web container
+shell-root:
+	$(PODMAN) exec -it --user root witti-web /bin/bash
+
+## Remove the local container image
+image-clean:
+	$(PODMAN) rmi $(IMAGE):$(IMAGE_TAG) || true
+
