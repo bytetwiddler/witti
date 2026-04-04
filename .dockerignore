@@ -1,0 +1,28 @@
+# Go build artifacts
+*.exe
+*.test
+/bin/
+/witti
+/witti-api
+/witti-web
+
+# Test / coverage
+cover.out
+
+# IDE / OS
+.idea/
+.vscode/
+*.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docs / CI only — keep api.md (it is embedded at build time)
+README.md
+CHANGELOG.md
+openapi.yaml
+LICENSE
+Makefile
+

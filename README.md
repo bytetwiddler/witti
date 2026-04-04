@@ -5,6 +5,7 @@
 ![Go](https://img.shields.io/badge/Go-1.24%2B-00ADD8?logo=go&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows%20%7C%20FreeBSD-blue)
+![Podman](https://img.shields.io/badge/container-Podman-892CA0?logo=podman&logoColor=white)
 
 ---
 
@@ -20,6 +21,7 @@
 - ✨ **Web SPA (Go + HTMX + Tailwind)** — Apple-style single-page interface on top of the same search API
 - 🔀 **Flexible flag placement** — flags may appear before or after query terms
 - ⚙️ **Custom format** — full Go time-format string support via `-format`
+- 🐳 **Container-ready** — multi-stage `Dockerfile` + `compose.yaml` for rootless Podman
 
 ---
 
@@ -50,6 +52,22 @@ make build
 ```
 
 The binary is placed in the project root (`witti` / `witti.exe`).
+
+### Run in a container
+
+Requires [Podman](https://podman.io/docs/installation) and
+[podman-compose](https://github.com/containers/podman-compose#installation)
+(`pip install podman-compose` or your distro's package).
+
+```bash
+# Build the image and start the combined web + API server
+make image-build
+make up
+```
+
+The container exposes port **8080** and runs as a non-root `witti` user inside
+a `debian:bookworm-slim` image. Both the web server (`witti-app`) and the CLI
+tool (`witti`) are installed at `/usr/local/bin/` in the image.
 
 ---
 
@@ -290,6 +308,73 @@ make clean
 
 ---
 
+## Container (Podman)
+
+The project ships a multi-stage `Dockerfile` and a `compose.yaml`.
+The runtime image is based on **`debian:bookworm-slim`** — the smallest
+Linux image with `apt` support (~97 MB total with binaries).
+
+### Image contents
+
+| Binary | Path in image | Purpose |
+| ------ | ------------- | ------- |
+| `witti-app` | `/usr/local/bin/witti-app` | Server entrypoint (`witti-web` by default) |
+| `witti` | `/usr/local/bin/witti` | CLI tool — always present for interactive use |
+
+### Podman Makefile targets
+
+```bash
+# Build (or rebuild) the container image
+make image-build
+
+# Start the web + API server in the background (port 8080)
+make up
+
+# Stop and remove containers
+make down
+
+# Show running compose services
+make ps
+
+# Follow container logs  (use ARGS='--tail 50' to limit output)
+make logs
+make logs ARGS='--tail 50'
+
+# Open an interactive shell as the witti user
+make shell
+
+# Open an interactive shell as root (no password needed)
+make shell-root
+
+# Remove the local container image
+make image-clean
+```
+
+> **Note on capability warnings:** rootless Podman prints
+> `can't raise ambient capability …` lines before each build step.
+> These are harmless host-side warnings from running without root on
+> the host and do not indicate any failure inside the container.
+
+### Overridable variables
+
+| Variable | Default | Example override |
+| -------- | ------- | ---------------- |
+| `IMAGE` | `witti-web` | `make image-build IMAGE=myrepo/witti` |
+| `IMAGE_TAG` | `latest` | `make image-build IMAGE_TAG=v1.2.0` |
+| `COMPOSE_FILE` | `compose.yaml` | `make up COMPOSE_FILE=compose.prod.yaml` |
+| `TARGET` | `witti-web` | `make image-build` with `--build-arg TARGET=witti-api` |
+
+### Build a different server target
+
+To containerise the standalone REST API server instead of the combined
+web + API server, pass `TARGET` as a build argument:
+
+```bash
+podman build --build-arg TARGET=witti-api -t witti-api:latest .
+```
+
+---
+
 ## Project structure
 
 ```
@@ -306,8 +391,10 @@ witti
 |   |   `-- main.go
 |   `-- witti-web/
 |       `-- main.go
+|-- compose.yaml
 |-- datetime.go
 |-- datetime_test.go
+|-- Dockerfile
 |-- errors.go
 |-- go.mod
 |-- go.sum
@@ -330,9 +417,6 @@ witti
 |-- query_test.go
 |-- run_test.go
 |-- search.go
-|-- witti-api.exe
-|-- witti-web.exe
-|-- witti.exe
 |-- witti.go
 |-- zones_default.go
 |-- zones_fs.go
