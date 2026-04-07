@@ -1,6 +1,6 @@
 # witti
 
-> **What Is The Time In (witti)?** — A fast, cross-platform CLI for searching IANA timezone names and displaying the current local time in each matched zone.
+> **What Is The Time In (witti)?** — A Go package for searching IANA timezone names and projecting times around the world. The repository also provides ready-to-run examples of a command-line tool, a REST API server, and a web interface built on top of the same package.
 
 ![Go](https://img.shields.io/badge/Go-1.24%2B-00ADD8?logo=go&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -18,7 +18,7 @@
 - 🕐 **12 / 24-hour clock** — 24-hour by default, switch with `-12h`
 - 🖥️ **Truly cross-platform** — bundles IANA tzdata via `time/tzdata`; no OS timezone files required
 - 🌐 **REST API** — exposes the same search/projection features over HTTP JSON
-- ✨ **Web SPA (Go + HTMX + Tailwind)** — Apple-style single-page interface on top of the same search API
+- ✨ **Web UI (Go + HTMX + Tailwind)** — server-rendered interface on top of the same search API
 - 🔀 **Flexible flag placement** — flags may appear before or after query terms
 - ⚙️ **Custom format** — full Go time-format string support via `-format`
 - 🐳 **Container-ready** — multi-stage `Dockerfile` + `compose.yaml` for rootless Podman
@@ -27,28 +27,22 @@
 
 ## Installation
 
-### Pre-built binaries
+### Import the package
 
-Download the binary for your platform from the [Releases](../../releases) page.
+```bash
+go get github.com/bytetwiddler/witti/v2
+```
 
-| Platform            | Binary                    |
-| ------------------- | ------------------------- |
-| Linux x86-64        | `witti-linux-amd64`       |
-| Linux ARM64         | `witti-linux-arm64`       |
-| macOS Intel         | `witti-darwin-amd64`      |
-| macOS Apple Silicon | `witti-darwin-arm64`      |
-| Windows x86-64      | `witti-windows-amd64.exe` |
-| Windows ARM64       | `witti-windows-arm64.exe` |
-| FreeBSD x86-64      | `witti-freebsd-amd64`     |
-
-### Build from source
+### Build the example binaries from source
 
 Requires [Go 1.24+](https://go.dev/dl/).
 
 ```bash
 git clone https://github.com/bytetwiddler/witti.git
 cd witti
-make build
+make build        # CLI binary
+make build-api    # REST API server
+make build-web    # combined web + API server
 ```
 
 The binary is placed in the project root (`witti` / `witti.exe`).
@@ -71,6 +65,123 @@ tool (`witti`) are installed at `/usr/local/bin/` in the image.
 
 ---
 
+## Using the Go package
+
+Import path: `github.com/bytetwiddler/witti/v2`
+
+Full reference: [`pkg.go.dev/github.com/bytetwiddler/witti/v2`](https://pkg.go.dev/github.com/bytetwiddler/witti/v2)
+
+### Key types
+
+| Type | Description |
+| ---- | ----------- |
+| `SearchRequest` | Input: query terms, format options, optional projected time |
+| `SearchResponse` | Output: metadata + slice of `SearchMatch` results |
+| `SearchMatch` | One matched timezone: formatted local time, UTC time, offset, abbreviation |
+
+### Search for the current time in matched zones
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    "time"
+
+    "github.com/bytetwiddler/witti/v2"
+)
+
+func main() {
+    resp, err := witti.Search(witti.SearchRequest{
+        QueryTerms: []string{"new york", "tokyo", "london"},
+    }, time.Now, time.Local)
+    if err != nil {
+        log.Fatal(err)
+    }
+    for _, m := range resp.Results {
+        fmt.Printf("%-32s  %s\n", m.ZoneName, m.FormattedTime)
+        fmt.Printf("%-32s  %s\n", "", m.UTCTime)
+    }
+}
+```
+
+Output:
+
+```text
+America/New_York                  Mon 2026-04-06 17:17:54 EDT -04:00 (GMT-4)
+                                  Mon 2026-04-06 21:17:54 UTC
+Asia/Tokyo                        Tue 2026-04-07 06:17:54 JST +09:00 (GMT+9)
+                                  Mon 2026-04-06 21:17:54 UTC
+Europe/London                     Mon 2026-04-06 22:17:54 BST +01:00 (GMT+1)
+                                  Mon 2026-04-06 21:17:54 UTC
+```
+
+### Project a fixed datetime across zones
+
+```go
+resp, err := witti.Search(witti.SearchRequest{
+    QueryTerms:         []string{"new york", "tokyo"},
+    ProjectedLocalTime: "02/17/2027 07:07:00",   // MM/DD/YYYY HH:MM:SS
+    LocalTimeZone:      "America/Los_Angeles",
+}, time.Now, time.Local)
+```
+
+### Match zones by UTC offset
+
+```go
+resp, err := witti.Search(witti.SearchRequest{
+    QueryTerms: []string{"gmt-7"},  // offset mode: all zones at UTC-07:00
+    Limit:      5,
+}, time.Now, time.Local)
+```
+
+### Use 12-hour clock or a custom format
+
+```go
+resp, err := witti.Search(witti.SearchRequest{
+    QueryTerms: []string{"paris"},
+    Use12Hour:  true,
+    // Or supply any Go time-format string:
+    // Format: "2006-01-02 15:04 MST",
+}, time.Now, time.Local)
+```
+
+### List all discoverable IANA zone names
+
+```go
+zones, err := witti.AllZones()
+// zones is a sorted []string of every IANA zone name in the embedded tzdata.
+```
+
+### SearchRequest fields
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `QueryTerms` | `[]string` | One or more search terms (name substring, `gmt±offset`, or inline datetime) |
+| `Limit` | `int` | Maximum results; `0` = no limit |
+| `Use12Hour` | `bool` | 12-hour AM/PM output (ignored when `Format` is set) |
+| `Format` | `string` | Go time-format string; overrides `Use12Hour` |
+| `ProjectedLocalTime` | `string` | Datetime string to project (`MM/DD/YYYY HH:MM:SS` or ISO variants) |
+| `LocalTimeZone` | `string` | IANA name for the timezone that owns `ProjectedLocalTime` |
+| `ZoneinfoRoot` | `string` | Path to a custom IANA zoneinfo directory; empty uses built-in tzdata |
+| `ShowPath` | `bool` | Prefix `DisplayName` with the full zoneinfo file path (requires `ZoneinfoRoot`) |
+
+### SearchMatch fields
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `ZoneName` | `string` | IANA zone identifier, e.g. `America/New_York` |
+| `DisplayName` | `string` | Zone name (or full path when `ShowPath` is set) |
+| `Time` | `time.Time` | The instant in this zone |
+| `FormattedTime` | `string` | Human-readable local time using the requested format |
+| `GMTLabel` | `string` | Compact offset label, e.g. `GMT-7` |
+| `UTCTime` | `string` | Same instant formatted in UTC |
+| `UTCOffsetSeconds` | `int` | UTC offset in seconds |
+| `Abbreviation` | `string` | Zone abbreviation, e.g. `EST`, `JST` |
+
+---
+
 ## Usage
 
 ```
@@ -87,9 +198,9 @@ witti <query...> [options]
 | `-showpath`        | off                                  | Show full zoneinfo path (requires `-zoneinfo`) |
 | `-zoneinfo <path>` | built-in                             | Override IANA timezone data root for discovery |
 
-## Web UI (SPA)
+## Web UI
 
-The project includes a single-page web app with an Apple-like look and feel, built with:
+The project includes a server-rendered web interface built with:
 
 - **Go** HTTP server
 - **HTMX** for dynamic partial updates (no frontend build step)
@@ -109,11 +220,11 @@ go run ./cmd/witti-web -addr :8080
 
 Open:
 
-- `http://localhost:8080/` → SPA
+- `http://localhost:8080/` → web UI
 - `http://localhost:8080/v1/search` → REST API endpoint
 - `http://localhost:8080/healthz` → health check
 
-The web UI posts form data to `/ui/search`, which returns HTML fragments rendered server-side from the same library logic used by CLI/API.
+The web UI posts form data to `/ui/search`, which returns HTML fragments rendered server-side from the same library logic used by CLI/API. Each result card shows the local formatted time on the first line and the same instant in UTC on the second line.
 
 ## REST API
 
@@ -150,7 +261,26 @@ Request JSON fields mirror library/CLI behavior:
 - `localTimeZone` (optional): IANA timezone name for parsing projected local datetime
 - `zoneinfoRoot`, `format`, `use12Hour`, `limit`, `showPath`
 
-Response includes metadata (`querySummary`, `referenceTime`, `projectedTime`, `offsetMode`) and structured `results`.
+Response includes metadata (`querySummary`, `referenceTime`, `projectedTime`, `offsetMode`) and structured `results`. Each result object includes the primary display time in `formattedTime` and the UTC companion value in `utcTime`.
+
+Example response shape:
+
+```json
+{
+  "success": true,
+  "data": {
+	"querySummary": "tokyo",
+	"results": [
+	  {
+		"zoneName": "Asia/Tokyo",
+		"formattedTime": "Tue 2026-04-07 06:16:43 JST +09:00",
+		"gmtLabel": "GMT+9",
+		"utcTime": "Mon 2026-04-06 21:16:43 UTC"
+	  }
+	]
+  }
+}
+```
 
 ---
 
@@ -160,11 +290,14 @@ All timestamped output below is **sample output**. Your actual results depend on
 
 > Offsets and abbreviations (for example `PST`/`PDT`, `EST`/`EDT`) can change by date due to DST and regional timezone rule updates.
 
+In the CLI and web UI, each match is rendered as two lines: the local time line first, followed by the same instant formatted in UTC. In the API, the same UTC value is returned in each result object's `utcTime` field.
+
 ### Search by city name
 
 ```text
 $ witti "Los Angeles"
-America/Los_Angeles               Wed 2026-03-25 12:40:39 PDT -07:00
+America/Los_Angeles               Mon 2026-04-06 14:17:54 PDT -07:00 (GMT-7)
+                                  Mon 2026-04-06 21:17:54 UTC
 ```
 
 Natural-language names with spaces match underscore-separated IANA zone IDs automatically.
@@ -173,20 +306,28 @@ Natural-language names with spaces match underscore-separated IANA zone IDs auto
 
 ```text
 $ witti america -limit 5
-America/Anchorage                 Wed 2026-03-25 11:40:39 AKDT -08:00
-America/Argentina/Buenos_Aires    Wed 2026-03-25 16:40:39 -03 -03:00
-America/Bogota                    Wed 2026-03-25 14:40:39 -05 -05:00
-America/Chicago                   Wed 2026-03-25 13:40:39 CDT -05:00
-America/Denver                    Wed 2026-03-25 12:40:39 MDT -06:00
+America/Anchorage                 Mon 2026-04-06 13:17:54 AKDT -08:00 (GMT-8)
+                                  Mon 2026-04-06 21:17:54 UTC
+America/Argentina/Buenos_Aires    Mon 2026-04-06 18:17:54 -03 -03:00 (GMT-3)
+                                  Mon 2026-04-06 21:17:54 UTC
+America/Bogota                    Mon 2026-04-06 16:17:54 -05 -05:00 (GMT-5)
+                                  Mon 2026-04-06 21:17:54 UTC
+America/Chicago                   Mon 2026-04-06 16:17:54 CDT -05:00 (GMT-5)
+                                  Mon 2026-04-06 21:17:54 UTC
+America/Denver                    Mon 2026-04-06 15:17:54 MDT -06:00 (GMT-6)
+                                  Mon 2026-04-06 21:17:54 UTC
 ```
 
 ### Multiple queries at once
 
 ```text
 $ witti "buenos aires" "new york" Anchorage
-America/Anchorage                 Wed 2026-03-25 11:40:39 AKDT -08:00
-America/Argentina/Buenos_Aires    Wed 2026-03-25 16:40:39 -03 -03:00
-America/New_York                  Wed 2026-03-25 15:40:39 EDT -04:00
+America/Anchorage                 Mon 2026-04-06 13:17:54 AKDT -08:00 (GMT-8)
+                                  Mon 2026-04-06 21:17:54 UTC
+America/Argentina/Buenos_Aires    Mon 2026-04-06 18:17:54 -03 -03:00 (GMT-3)
+                                  Mon 2026-04-06 21:17:54 UTC
+America/New_York                  Mon 2026-04-06 17:17:54 EDT -04:00 (GMT-4)
+                                  Mon 2026-04-06 21:17:54 UTC
 ```
 
 Results from all query terms are combined, deduplicated, and sorted.
@@ -207,7 +348,8 @@ Only one projected datetime argument is allowed per command.
 ```text
 $ witti "02/17/2027 07:07:00" "new york"
 info: projecting local time 2027-02-17 07:07:00 PST
-America/New_York                  Wed 2027-02-17 10:07:00 EST -05:00
+America/New_York                  Wed 2027-02-17 10:07:00 EST -05:00 (GMT-5)
+                                  Wed 2027-02-17 15:07:00 UTC
 ```
 
 ### Offset-aware query
@@ -217,9 +359,12 @@ Queries beginning with `gmt+` or `gmt-` switch to **offset mode** — matching e
 ```text
 $ witti "gmt-7" -limit 3
 info: offset-aware mode active (gmt-7 -> UTC-07:00)
-America/Los_Angeles               Wed 2026-03-25 12:40:39 PDT -07:00
-America/Phoenix                   Wed 2026-03-25 12:40:39 MST -07:00
-America/Vancouver                 Wed 2026-03-25 12:40:39 PDT -07:00
+America/Los_Angeles               Mon 2026-04-06 14:17:54 PDT -07:00 (GMT-7)
+                                  Mon 2026-04-06 21:17:54 UTC
+America/Phoenix                   Mon 2026-04-06 14:17:54 MST -07:00 (GMT-7)
+                                  Mon 2026-04-06 21:17:54 UTC
+America/Vancouver                 Mon 2026-04-06 14:17:54 PDT -07:00 (GMT-7)
+                                  Mon 2026-04-06 21:17:54 UTC
 ```
 
 Supported offset formats:
@@ -238,7 +383,8 @@ Supported offset formats:
 
 ```text
 $ witti tokyo -limit 1 -12h
-Asia/Tokyo                        Thu 2026-03-26 04:40:39 AM JST +09:00
+Asia/Tokyo                        Tue 2026-04-07 06:17:54 AM JST +09:00 (GMT+9)
+                                  Mon 2026-04-06 09:17:54 PM UTC
 ```
 
 The `-12h` flag is ignored when `-format` is also provided, since `-format` always takes precedence.
@@ -249,7 +395,8 @@ Uses [Go time format syntax](https://pkg.go.dev/time#Layout).
 
 ```text
 $ witti paris -format "2006-01-02 15:04 MST"
-Europe/Paris                      2026-03-25 21:40 CET
+Europe/Paris                      2026-04-06 23:17 CEST (GMT+2)
+                                  Mon 2026-04-06 21:17:54 UTC
 ```
 
 ### Flags before or after the query
@@ -362,7 +509,6 @@ make image-clean
 | `IMAGE` | `witti-web` | `make image-build IMAGE=myrepo/witti` |
 | `IMAGE_TAG` | `latest` | `make image-build IMAGE_TAG=v1.2.0` |
 | `COMPOSE_FILE` | `compose.yaml` | `make up COMPOSE_FILE=compose.prod.yaml` |
-| `TARGET` | `witti-web` | `make image-build` with `--build-arg TARGET=witti-api` |
 
 ### Build a different server target
 
