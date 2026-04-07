@@ -11,7 +11,7 @@ paths:
       summary: Health check
       operationId: healthz
       responses:
-        '200':
+        "200":
           description: Service healthy
           content:
             application/json:
@@ -21,7 +21,7 @@ paths:
                   status:
                     type: string
                     example: ok
-        '405':
+        "405":
           description: Method not allowed
   /v1/search:
     post:
@@ -32,32 +32,32 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SearchRequest'
+              $ref: "#/components/schemas/SearchRequest"
       responses:
-        '200':
+        "200":
           description: Search completed
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SearchHTTPResponseSuccess'
-        '400':
+                $ref: "#/components/schemas/SearchHTTPResponseSuccess"
+        "400":
           description: Invalid request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SearchHTTPResponseError'
-        '405':
+                $ref: "#/components/schemas/SearchHTTPResponseError"
+        "405":
           description: Method not allowed
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SearchHTTPResponseError'
-        '500':
+                $ref: "#/components/schemas/SearchHTTPResponseError"
+        "500":
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SearchHTTPResponseError'
+                $ref: "#/components/schemas/SearchHTTPResponseError"
 components:
   schemas:
     SearchRequest:
@@ -158,7 +158,7 @@ components:
         results:
           type: array
           items:
-            $ref: '#/components/schemas/SearchMatch'
+            $ref: "#/components/schemas/SearchMatch"
     SearchHTTPResponseSuccess:
       type: object
       properties:
@@ -166,7 +166,7 @@ components:
           type: boolean
           example: true
         data:
-          $ref: '#/components/schemas/SearchResponse'
+          $ref: "#/components/schemas/SearchResponse"
     SearchHTTPResponseError:
       type: object
       properties:
@@ -176,4 +176,3 @@ components:
         error:
           type: string
           example: invalid JSON request
-
